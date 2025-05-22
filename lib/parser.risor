@@ -1,0 +1,352 @@
+import os
+import strings
+import cli
+
+// Simple parser to extract API documentation from Risor files and global functions
+
+// Extract a doc comment, removing the leading // and trimming spaces
+func parse_comment(line) {
+  if strings.has_prefix(line, "//") {
+    if len(line) > 2 {
+      return strings.trim_space(line[2:])
+    }
+    return ""
+  }
+  return strings.trim_space(line)
+}
+
+// Get documentation comments from the file, searching backward from the given line
+func extract_comments(lines, start_idx) {
+  result := []
+  i := start_idx
+
+  // Search backward until we find a non-comment line
+  for i >= 0 {
+    line := strings.trim_space(lines[i])
+    if !strings.has_prefix(line, "//") {
+      break
+    }
+    parsed := parse_comment(line)
+    // Insert at beginning to maintain original order
+    result = [parsed] + result
+    i -= 1
+  }
+
+  return result
+}
+
+// Parse documentation sections (description, parameters, returns)
+func parse_docs(comments) {
+  desc := []
+  params := []
+  returns := ""
+
+  section := "desc"
+
+  for i := 0; i < len(comments); i += 1 {
+    line := comments[i]
+
+    // Skip annotation lines
+    if strings.has_prefix(line, "@") {
+      continue
+    }
+
+    if strings.has_prefix(line, "Parameters:") {
+      section = "params"
+      continue
+    }
+
+    if strings.has_prefix(line, "Returns:") {
+      section = "returns"
+      returns = strings.trim_space(line[8:])
+      continue
+    }
+
+    if section == "desc" {
+      desc = desc + [line]
+    } else if section == "params" {
+      if strings.has_prefix(line, "-") {
+        params = params + [line]
+      }
+    } else if section == "returns" && returns == "" {
+      returns = line
+    }
+  }
+
+  // Default values
+  desc_text := strings.join(desc, " ")
+  if desc_text == "" {
+    desc_text = "No description available."
+  }
+
+  if returns == "" {
+    returns = "No return information available."
+  }
+
+  return {
+    description: desc_text,
+    params: params,
+    returns: returns
+  }
+}
+
+// Extract method name from a line like "client.method_name = func(...)"
+func extract_method_name(line) {
+  parts := strings.split(line, "=")
+  if len(parts) < 2 {
+    return ""
+  }
+
+  method_part := strings.trim_space(parts[0])
+  method_parts := strings.split(method_part, ".")
+  if len(method_parts) < 2 {
+    return ""
+  }
+
+  return strings.trim_space(method_parts[1])
+}
+
+// Extract parameters from a line like "func(param1, param2)"
+func extract_params(line) {
+  start := strings.index(line, "(")
+  end := strings.index(line, ")")
+
+  if start == -1 || end == -1 || end <= start {
+    return []
+  }
+
+  params_str := line[start+1:end]
+  if strings.trim_space(params_str) == "" {
+    return []
+  }
+
+  parts := strings.split(params_str, ",")
+  result := []
+
+  for i := 0; i < len(parts); i += 1 {
+    result = result + [strings.trim_space(parts[i])]
+  }
+
+  return result
+}
+
+// Extract function name from a line like "func function_name(param1, param2)"
+func extract_function_name(line) {
+  if !strings.has_prefix(line, "func ") {
+    return ""
+  }
+
+  // Remove the "func " prefix
+  function_part := line[5:]
+
+  // Find the opening parenthesis
+  paren_idx := strings.index(function_part, "(")
+  if paren_idx == -1 {
+    return ""
+  }
+
+  // Return the name part
+  return strings.trim_space(function_part[0:paren_idx])
+}
+
+// Parse a Risor file to extract API documentation
+func parse_file(filename) {
+  content := string(os.read_file(filename))
+  lines := strings.split(content, "\n")
+
+  class_name := ""
+  methods := []
+  global_functions := []
+
+  for i := 0; i < len(lines); i += 1 {
+    line := strings.trim_space(lines[i])
+
+    // Look for class declaration
+    if strings.contains(line, "@object.class") {
+      if i + 1 < len(lines) {
+        class_line := lines[i+1]
+        parts := strings.split(class_line, ":=")
+        if len(parts) >= 2 {
+          class_name = strings.trim_space(parts[0])
+        }
+      }
+    }
+
+    // Look for global function declarations
+    if strings.contains(line, "@global.function") {
+      if i + 1 < len(lines) {
+        func_line := lines[i+1]
+        func_name := extract_function_name(func_line)
+
+        if func_name != "" {
+          comments := extract_comments(lines, i-1)
+          docs := parse_docs(comments)
+          params := extract_params(func_line)
+
+          function := {
+            name: func_name,
+            docs: docs,
+            params: params
+          }
+
+          global_functions = global_functions + [function]
+        }
+      }
+    }
+
+    // Look for method declarations
+    if strings.contains(line, "@object.method") {
+      if i + 1 < len(lines) {
+        method_line := lines[i+1]
+        method_name := extract_method_name(method_line)
+
+        if method_name != "" {
+          comments := extract_comments(lines, i-1)
+          docs := parse_docs(comments)
+          params := extract_params(method_line)
+
+          method := {
+            name: method_name,
+            docs: docs,
+            params: params
+          }
+
+          methods = methods + [method]
+        }
+      }
+    }
+  }
+
+  return {
+    class_name: class_name,
+    methods: methods,
+    global_functions: global_functions
+  }
+}
+
+// Generate markdown documentation from parsed API data
+func generate_markdown(data) {
+  class_name := data.class_name
+  methods := data.methods
+  global_functions := data.global_functions
+
+  lines := []
+
+  // Add global functions section if any exist
+  if len(global_functions) > 0 {
+    lines = lines + ["# Global Functions"]
+    lines = lines + [""]
+
+    // Add each global function
+    for i := 0; i < len(global_functions); i += 1 {
+      function := global_functions[i]
+
+      // Function heading
+      lines = lines + ["## " + function.name]
+      lines = lines + [""]
+
+      // Description
+      lines = lines + [function.docs.description]
+      lines = lines + [""]
+
+      // Parameters
+      if len(function.docs.params) > 0 {
+        lines = lines + ["### Parameters"]
+        lines = lines + [""]
+
+        for j := 0; j < len(function.docs.params); j += 1 {
+          lines = lines + [function.docs.params[j]]
+        }
+
+        lines = lines + [""]
+      }
+
+      // Returns
+      lines = lines + ["### Returns"]
+      lines = lines + [""]
+      lines = lines + [function.docs.returns]
+      lines = lines + [""]
+
+      // Example
+      lines = lines + ["### Example"]
+      lines = lines + [""]
+      lines = lines + ["```risor"]
+      lines = lines + ["// Example usage of " + function.name]
+
+      signature := function.name + "("
+
+      if len(function.params) > 0 {
+        param_list := []
+        for j := 0; j < len(function.params); j += 1 {
+          param_list = param_list + [function.params[j]]
+        }
+        signature = signature + strings.join(param_list, ", ")
+      }
+
+      signature = signature + ")"
+      lines = lines + [signature]
+      lines = lines + ["```"]
+      lines = lines + [""]
+    }
+  }
+
+  // Add class section if class_name exists
+  if class_name != "" {
+    lines = lines + ["# " + class_name + " class"]
+    lines = lines + [""]
+
+    // Add each method
+    for i := 0; i < len(methods); i += 1 {
+      method := methods[i]
+
+      // Method heading
+      lines = lines + ["## " + method.name]
+      lines = lines + [""]
+
+      // Description
+      lines = lines + [method.docs.description]
+      lines = lines + [""]
+
+      // Parameters
+      if len(method.docs.params) > 0 {
+        lines = lines + ["### Parameters"]
+        lines = lines + [""]
+
+        for j := 0; j < len(method.docs.params); j += 1 {
+          lines = lines + [method.docs.params[j]]
+        }
+
+        lines = lines + [""]
+      }
+
+      // Returns
+      lines = lines + ["### Returns"]
+      lines = lines + [""]
+      lines = lines + [method.docs.returns]
+      lines = lines + [""]
+
+      // Example
+      lines = lines + ["### Example"]
+      lines = lines + [""]
+      lines = lines + ["```risor"]
+      lines = lines + ["// Example usage of " + method.name]
+
+      signature := class_name + "." + method.name + "("
+
+      if len(method.params) > 0 {
+        param_list := []
+        for j := 0; j < len(method.params); j += 1 {
+          param_list = param_list + [method.params[j]]
+        }
+        signature = signature + strings.join(param_list, ", ")
+      }
+
+      signature = signature + ")"
+      lines = lines + [signature]
+      lines = lines + ["```"]
+      lines = lines + [""]
+    }
+  }
+
+  return strings.join(lines, "\n")
+}

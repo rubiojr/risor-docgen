@@ -1,0 +1,92 @@
+#!/usr/bin/env -S rsx eval
+import parser
+from parser import parse_file, generate_markdown
+
+// Main program
+func main() {
+  app := cli.app({
+    name: "risor-doc",
+    description: "Generate API documentation from Risor source files",
+    flags: [
+      cli.flag({
+        name: "input",
+        aliases: ["i"],
+        usage: "Input Risor file",
+        type: "string",
+        required: true
+      }),
+      cli.flag({
+        name: "output",
+        aliases: ["o"],
+        usage: "Output Markdown file",
+        value: "api.md"
+      })
+    ],
+    action: func(ctx) {
+      input := ctx.string("input")
+      output := ctx.string("output")
+
+      // Check if input file exists
+      exists := try(
+        func() {
+          os.stat(input)
+          return true
+        },
+        func(err) {
+          return false
+        }
+      )
+
+      if !exists {
+        print("Error: File not found: " + input)
+        os.exit(1)
+      }
+
+      // Parse the file
+      print("Parsing " + input + "...")
+      data := parse_file(input)
+
+      // Validate results
+      if data.class_name == "" && len(data.global_functions) == 0 {
+        print("Error: No class or global functions found in file")
+        os.exit(1)
+      }
+
+      if data.class_name != "" && len(data.methods) == 0 && len(data.global_functions) == 0 {
+        print("Error: Class found but no methods or global functions")
+        os.exit(1)
+      }
+
+      // Generate markdown
+      print("Generating markdown...")
+      markdown := generate_markdown(data)
+
+      // Write output file
+      print("Writing to " + output + "...")
+      os.write_file(output, markdown)
+
+      methods_count := len(data.methods)
+      global_functions_count := len(data.global_functions)
+
+      result_message := "Done! Found "
+
+      if global_functions_count > 0 {
+        result_message = result_message + string(global_functions_count) + " global functions"
+      }
+
+      if data.class_name != "" && methods_count > 0 {
+        if global_functions_count > 0 {
+          result_message = result_message + " and "
+        }
+        result_message = result_message + string(methods_count) + " methods for class " + data.class_name
+      }
+
+      print(result_message)
+    }
+  })
+
+  app.run()
+}
+
+// Run the program
+main()
