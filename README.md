@@ -78,7 +78,7 @@ Calculator := {
 
 Output Markdown:
 
-```markdown
+````markdown
 # Calculator class
 
 ## add
@@ -100,7 +100,7 @@ Sum of a and b
 // Example usage of add
 Calculator.add(a, b)
 ```
-```
+````
 
 ## License
 
