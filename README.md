@@ -22,7 +22,7 @@ A command-line tool for automatically generating API documentation in Markdown f
 ## Usage
 
 ```
-./risor-docs -i <input_file> -o <output_file>
+./risor-docgen -i <input_file> -o <output_file>
 ```
 
 ### Arguments

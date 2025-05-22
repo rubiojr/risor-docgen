@@ -270,7 +270,7 @@ func generate_markdown(data) {
       // Example
       lines = lines + ["### Example"]
       lines = lines + [""]
-      lines = lines + ["```risor"]
+      lines = lines + ["```go"]
       lines = lines + ["// Example usage of " + function.name]
 
       signature := function.name + "("
@@ -328,7 +328,7 @@ func generate_markdown(data) {
       // Example
       lines = lines + ["### Example"]
       lines = lines + [""]
-      lines = lines + ["```risor"]
+      lines = lines + ["```go"]
       lines = lines + ["// Example usage of " + method.name]
 
       signature := class_name + "." + method.name + "("
