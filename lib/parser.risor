@@ -293,9 +293,13 @@ func generate_markdown(data) {
     }
   }
 
+  if class_name != "" {
+    lines = lines + ["# Classes"]
+  }
+
   // Add class section if class_name exists
   if class_name != "" {
-    lines = lines + ["# " + class_name + " class"]
+    lines = lines + ["## " + class_name]
     lines = lines + [""]
 
     // Add each method
@@ -303,7 +307,7 @@ func generate_markdown(data) {
       method := methods[i]
 
       // Method heading
-      lines = lines + ["## " + method.name]
+      lines = lines + ["### " + method.name]
       lines = lines + [""]
 
       // Description
@@ -312,7 +316,7 @@ func generate_markdown(data) {
 
       // Parameters
       if len(method.docs.params) > 0 {
-        lines = lines + ["### Parameters"]
+        lines = lines + ["#### Parameters"]
         lines = lines + [""]
 
         for j := 0; j < len(method.docs.params); j += 1 {
@@ -323,13 +327,13 @@ func generate_markdown(data) {
       }
 
       // Returns
-      lines = lines + ["### Returns"]
+      lines = lines + ["#### Returns"]
       lines = lines + [""]
       lines = lines + [method.docs.returns]
       lines = lines + [""]
 
       // Example
-      lines = lines + ["### Example"]
+      lines = lines + ["#### Example"]
       lines = lines + [""]
       lines = lines + ["```go"]
       lines = lines + ["// Example usage of " + method.name]

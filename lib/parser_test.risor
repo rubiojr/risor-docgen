@@ -209,12 +209,14 @@ func test_generate_markdown() {
   }
 
   markdown := parser.generate_markdown(parsed_data)
+  test.is_true("Markdown contains a Classes section",
+    strings.contains(markdown, "# Classes"))
   test.is_true("Markdown contains global functions section",
     strings.contains(markdown, "# Global Functions"))
   test.is_true("Markdown contains function name",
     strings.contains(markdown, "## test_function"))
   test.is_true("Markdown contains class section",
-    strings.contains(markdown, "# TestClass class"))
+    strings.contains(markdown, "## TestClass"))
   test.is_true("Markdown contains method name",
     strings.contains(markdown, "## test_method"))
   test.is_true("Markdown contains example",
