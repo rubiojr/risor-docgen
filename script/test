@@ -1,0 +1,3 @@
+#!/bin/sh
+
+rsx eval lib/*test.risor
