@@ -58,7 +58,10 @@ func parse_docs(comments) {
 
     if strings.has_prefix(line, "Returns:") {
       section = "returns"
-      returns = strings.trim_space(line[8:])
+      returns = ""
+      if len(line) > 8 {
+        returns = strings.trim_space(line[8:])
+      }
       continue
     }
 
@@ -74,7 +77,7 @@ func parse_docs(comments) {
   }
 
   // Default values
-  desc_text := strings.join(desc, " ")
+  desc_text := strings.trim_space(strings.join(desc, " "))
   if desc_text == "" {
     desc_text = "No description available."
   }

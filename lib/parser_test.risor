@@ -1,0 +1,241 @@
+import os
+import test
+import strings
+import parser
+
+func create_test_file(path, content) {
+  os.write_file(path, content)
+}
+
+func test_parse_comment() {
+  test.equals("Parse comment with content",
+    parser.parse_comment("// This is a comment"),
+    "This is a comment")
+
+  test.equals("Parse empty comment",
+    parser.parse_comment("//"),
+    "")
+
+  test.equals("Parse non-comment",
+    parser.parse_comment("This is not a comment"),
+    "This is not a comment")
+}
+
+func test_extract_comments() {
+  lines := [
+    "import os",
+    "",
+    "// First comment line",
+    "// Second comment line",
+    "func something() {}"
+  ]
+
+  comments := parser.extract_comments(lines, 3)
+  test.equals("Extract multiple comment lines",
+    comments,
+    ["First comment line", "Second comment line"])
+
+  comments = parser.extract_comments(lines, 4)
+  test.equals("Extract no comments when starting at non-comment",
+    comments,
+    [])
+}
+
+func test_parse_docs() {
+  comments := [
+    "This is the description.",
+    "More description here.",
+    "Parameters:",
+    "- param1: first parameter",
+    "- param2: second parameter",
+    "Returns:",
+    "Result of the operation"
+  ]
+
+  docs := parser.parse_docs(comments)
+  test.equals("Parse docs description",
+    docs.description,
+    "This is the description. More description here.")
+
+  test.equals("Parse docs parameters",
+    docs.params,
+    ["- param1: first parameter", "- param2: second parameter"])
+
+  test.equals("Parse docs returns",
+    docs.returns,
+    "Result of the operation")
+}
+
+func test_extract_function_name() {
+  test.equals("Extract simple function name",
+    parser.extract_function_name("func test_function(param1, param2) {"),
+    "test_function")
+
+  test.equals("Extract function name with no params",
+    parser.extract_function_name("func no_params() {"),
+    "no_params")
+
+  test.equals("Extract function from non-function line",
+    parser.extract_function_name("not a function"),
+    "")
+}
+
+func test_extract_method_name() {
+  test.equals("Extract method name",
+    parser.extract_method_name("client.method_name = func(param)"),
+    "method_name")
+
+  test.equals("Extract method from invalid line",
+    parser.extract_method_name("not a method"),
+    "")
+}
+
+func test_extract_params() {
+  test.equals("Extract multiple params",
+    parser.extract_params("func test(param1, param2)"),
+    ["param1", "param2"])
+
+  test.equals("Extract single param",
+    parser.extract_params("func test(param)"),
+    ["param"])
+
+  test.equals("Extract no params",
+    parser.extract_params("func test()"),
+    [])
+}
+
+func test_parse_global_function() {
+  content := `
+import os
+
+// Calculate the sum of two numbers
+//
+// Parameters:
+// - a: first number
+// - b: second number
+// Returns:
+// The sum of a and b
+@global.function
+func add(a, b) {
+  return a + b
+}
+  `
+
+  test.with_temp_dir(func(dir) {
+    file_path := filepath.join(dir, "test_func.risor")
+    create_test_file(file_path, content)
+
+    result := parser.parse_file(file_path)
+
+    test.equals("Parse file class name empty", result.class_name, "")
+    test.equals("Parse file methods empty", len(result.methods), 0)
+    test.equals("Parse file functions length", len(result.global_functions), 1)
+
+    func_data := result.global_functions[0]
+    test.equals("Parse function name", func_data.name, "add")
+    test.equals("Parse function param count", len(func_data.params), 2)
+    test.equals("Parse function first param", func_data.params[0], "a")
+    test.equals("Parse function docs description",
+      func_data.docs.description,
+      "Calculate the sum of two numbers")
+  })
+}
+
+func test_parse_class_method() {
+  content := `
+import os
+
+@object.class
+Client := {}
+
+// Send a request to the server
+//
+// Parameters:
+// - url: target URL
+// - data: request payload
+// Returns:
+// Response from the server
+@object.method
+Client.send = func(url, data) {
+  return "response"
+}
+  `
+
+  test.with_temp_dir(func(dir) {
+    file_path := filepath.join(dir, "test_class.risor")
+    create_test_file(file_path, content)
+
+    result := parser.parse_file(file_path)
+
+    test.equals("Parse class name", result.class_name, "Client")
+    test.equals("Parse method count", len(result.methods), 1)
+    test.equals("Parse global functions empty", len(result.global_functions), 0)
+
+    method_data := result.methods[0]
+    test.equals("Parse method name", method_data.name, "send")
+    test.equals("Parse method param count", len(method_data.params), 2)
+    test.equals("Parse method params", method_data.params, ["url", "data"])
+    test.equals("Parse method docs description",
+      method_data.docs.description,
+      "Send a request to the server")
+  })
+}
+
+func test_generate_markdown() {
+  parsed_data := {
+    class_name: "TestClass",
+    methods: [
+      {
+        name: "test_method",
+        docs: {
+          description: "Test method description",
+          params: ["- param1: first parameter"],
+          returns: "Test return"
+        },
+        params: ["param1"]
+      }
+    ],
+    global_functions: [
+      {
+        name: "test_function",
+        docs: {
+          description: "Test function description",
+          params: ["- arg1: first argument"],
+          returns: "Function return"
+        },
+        params: ["arg1"]
+      }
+    ]
+  }
+
+  markdown := parser.generate_markdown(parsed_data)
+  test.is_true("Markdown contains global functions section",
+    strings.contains(markdown, "# Global Functions"))
+  test.is_true("Markdown contains function name",
+    strings.contains(markdown, "## test_function"))
+  test.is_true("Markdown contains class section",
+    strings.contains(markdown, "# TestClass class"))
+  test.is_true("Markdown contains method name",
+    strings.contains(markdown, "## test_method"))
+  test.is_true("Markdown contains example",
+    strings.contains(markdown, "### Example"))
+}
+
+func run_all_tests() {
+  print("\n=== Parser Tests ===\n")
+  test.print_ok("Starting tests...")
+
+  test_parse_comment()
+  test_extract_comments()
+  test_parse_docs()
+  test_extract_function_name()
+  test_extract_method_name()
+  test_extract_params()
+  test_parse_global_function()
+  test_parse_class_method()
+  test_generate_markdown()
+
+  print("\n=== Parser Tests Complete ===\n")
+}
+
+run_all_tests()
