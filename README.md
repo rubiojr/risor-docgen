@@ -36,7 +36,7 @@ The generator looks for specific comment patterns in your Risor code:
 
 ### Function/Method Documentation
 
-```risor
+```go
 // Description of the function
 // This can span multiple lines
 //
@@ -59,7 +59,7 @@ The tool looks for special annotation comments:
 
 Input Risor file:
 
-```risor
+```go
 // @object.class
 Calculator := {
   // Adds two numbers
@@ -96,7 +96,7 @@ Sum of a and b
 
 ### Example
 
-```risor
+```go
 // Example usage of add
 Calculator.add(a, b)
 ```
