@@ -233,7 +233,7 @@ func generate_markdown(data) {
   methods := data.methods
   global_functions := data.global_functions
 
-  lines := []
+  lines := ["__Documentation generated with [risor-docgen](https://github.com/rubiojr/risor-docgen).__\n"]
 
   // Add global functions section if any exist
   if len(global_functions) > 0 {
